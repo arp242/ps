@@ -1,12 +1,14 @@
 #!/bin/sh
+#
+# Quick test to ensure it at least compiles on all supported platforms.
 
 set -euC
 
-go test .
+go test -race .
 
-GOOS=windows go build
-GOOS=darwin go build
+GOOS=darwin  go build
 GOOS=freebsd go build
-GOOS=linux go build
-GOOS=illumos go build
-GOOS=solaris go build
+#GOOS=illumos go build
+GOOS=linux   go build
+#GOOS=solaris go build
+GOOS=windows go build

@@ -85,10 +85,8 @@ func findProcess(pid int) (Process, error) {
 	return nil, os.ErrNotExist
 }
 
-func processes() ([]Process, error) {
-	handle, _, _ := procCreateToolhelp32Snapshot.Call(
-		0x00000002,
-		0)
+func processes() (Processes, error) {
+	handle, _, _ := procCreateToolhelp32Snapshot.Call(0x00000002, 0)
 	if handle < 0 {
 		return nil, syscall.GetLastError()
 	}
@@ -98,18 +96,17 @@ func processes() ([]Process, error) {
 	entry.Size = uint32(unsafe.Sizeof(entry))
 	ret, _, _ := procProcess32First.Call(handle, uintptr(unsafe.Pointer(&entry)))
 	if ret == 0 {
-		return nil, fmt.Errorf("Error retrieving process info.")
+		return nil, fmt.Errorf("could not get process list")
 	}
 
-	results := make([]Process, 0, 50)
+	procs := make(Processes, 0, 64)
 	for {
-		results = append(results, newWindowsProcess(&entry))
+		procs = append(procs, newWindowsProcess(&entry))
 
 		ret, _, _ := procProcess32Next.Call(handle, uintptr(unsafe.Pointer(&entry)))
 		if ret == 0 {
 			break
 		}
 	}
-
-	return results, nil
+	return procs, nil
 }

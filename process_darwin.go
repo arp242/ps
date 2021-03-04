@@ -35,51 +35,43 @@ func findProcess(pid int) (Process, error) {
 			return p, nil
 		}
 	}
-
 	return nil, os.ErrNotExist
 }
 
-func processes() ([]Process, error) {
+func processes() (Processes, error) {
 	buf, err := darwinSyscall()
 	if err != nil {
 		return nil, err
 	}
 
-	procs := make([]*kinfoProc, 0, 50)
+	//procs := make([]*kinfoProc, 0, 64)
+	procs := make(Processes, 0, 64)
 	k := 0
 	for i := _KINFO_STRUCT_SIZE; i < buf.Len(); i += _KINFO_STRUCT_SIZE {
-		proc := &kinfoProc{}
-		err = binary.Read(bytes.NewBuffer(buf.Bytes()[k:i]), binary.LittleEndian, proc)
+		var p kinfoProc
+		err = binary.Read(bytes.NewBuffer(buf.Bytes()[k:i]), binary.LittleEndian, &p)
 		if err != nil {
 			return nil, err
 		}
-
 		k = i
-		procs = append(procs, proc)
-	}
 
-	darwinProcs := make([]Process, len(procs))
-	for i, p := range procs {
-		darwinProcs[i] = &DarwinProcess{
+		procs = append(procs, &DarwinProcess{
 			pid:    int(p.Pid),
 			ppid:   int(p.PPid),
 			binary: darwinCstring(p.Comm),
-		}
+		})
 	}
-
-	return darwinProcs, nil
+	return procs, nil
 }
 
 func darwinCstring(s [16]byte) string {
 	i := 0
 	for _, b := range s {
-		if b != 0 {
-			i++
-		} else {
+		if b == 0 {
 			break
 		}
+		i++
 	}
-
 	return string(s[:i])
 }
 
@@ -90,12 +82,9 @@ func darwinSyscall() (*bytes.Buffer, error) {
 	_, _, errno := syscall.Syscall6(
 		syscall.SYS___SYSCTL,
 		uintptr(unsafe.Pointer(&mib[0])),
-		4,
-		0,
+		4, 0,
 		uintptr(unsafe.Pointer(&size)),
-		0,
-		0)
-
+		0, 0)
 	if errno != 0 {
 		return nil, errno
 	}
@@ -107,9 +96,7 @@ func darwinSyscall() (*bytes.Buffer, error) {
 		4,
 		uintptr(unsafe.Pointer(&bs[0])),
 		uintptr(unsafe.Pointer(&size)),
-		0,
-		0)
-
+		0, 0)
 	if errno != 0 {
 		return nil, errno
 	}
@@ -124,6 +111,8 @@ const (
 	_KINFO_STRUCT_SIZE = 648
 )
 
+// https://github.com/apple/darwin-xnu/blob/8f02f2a044b9bb1ad951987ef5bab20ec9486310/bsd/sys/proc.h#L98
+// https://github.com/apple/darwin-xnu/blob/8f02f2a044b9bb1ad951987ef5bab20ec9486310/bsd/sys/sysctl.h#L757
 type kinfoProc struct {
 	_    [40]byte
 	Pid  int32

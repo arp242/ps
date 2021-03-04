@@ -5,6 +5,7 @@ package ps
 import (
 	"bytes"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"syscall"
 	"unsafe"
@@ -13,12 +14,11 @@ import (
 // UnixProcess is an implementation of Process that contains Unix-specific
 // fields and information.
 type UnixProcess struct {
-	pid   int
-	ppid  int
-	state rune
-	pgrp  int
-	sid   int
-
+	pid    int
+	ppid   int
+	state  rune
+	pgrp   int
+	sid    int
 	binary string
 }
 
@@ -123,15 +123,12 @@ type Kinfo_proc struct {
 
 // Refresh reloads all the data associated with this process.
 func (p *UnixProcess) Refresh() error {
-	mib := []int32{CTL_KERN, KERN_PROC, KERN_PROC_PID, int32(p.pid)}
-
-	buf, length, err := call_syscall(mib)
+	buf, length, err := call_syscall([]int32{CTL_KERN, KERN_PROC, KERN_PROC_PID, int32(p.pid)})
 	if err != nil {
 		return err
 	}
-	proc_k := Kinfo_proc{}
-	if length != uint64(unsafe.Sizeof(proc_k)) {
-		return err
+	if length != uint64(unsafe.Sizeof(Kinfo_proc{})) {
+		return errors.New("sysctl call failed: wrong length")
 	}
 
 	k, err := parse_kinfo_proc(buf)
@@ -139,11 +136,11 @@ func (p *UnixProcess) Refresh() error {
 		return err
 	}
 
-	p.ppid, p.pgrp, p.sid, p.binary = copy_params(&k)
+	p.ppid, p.pgrp, p.sid, p.binary = copyParams(&k)
 	return nil
 }
 
-func copy_params(k *Kinfo_proc) (int, int, int, string) {
+func copyParams(k *Kinfo_proc) (int, int, int, string) {
 	n := -1
 	for i, b := range k.Ki_comm {
 		if b == 0 {
@@ -157,31 +154,24 @@ func copy_params(k *Kinfo_proc) (int, int, int, string) {
 }
 
 func findProcess(pid int) (Process, error) {
-	mib := []int32{CTL_KERN, KERN_PROC, KERN_PROC_PATHNAME, int32(pid)}
+	_, _, err := call_syscall([]int32{CTL_KERN, KERN_PROC, KERN_PROC_PATHNAME, int32(pid)})
+	if err != nil {
+		return nil, err
+	}
+	return newUnixProcess(pid)
+}
 
-	_, _, err := call_syscall(mib)
+func processes() (Processes, error) {
+	buf, length, err := call_syscall([]int32{CTL_KERN, KERN_PROC, KERN_PROC_PROC, 0})
 	if err != nil {
 		return nil, err
 	}
 
-	return newUnixProcess(pid)
-}
-
-func processes() ([]Process, error) {
-	results := make([]Process, 0, 50)
-
-	mib := []int32{CTL_KERN, KERN_PROC, KERN_PROC_PROC, 0}
-	buf, length, err := call_syscall(mib)
-	if err != nil {
-		return results, err
-	}
-
-	// get kinfo_proc size
-	k := Kinfo_proc{}
+	var k Kinfo_proc
 	procinfo_len := int(unsafe.Sizeof(k))
 	count := int(length / uint64(procinfo_len))
 
-	// parse buf to procs
+	procs := make(Processes, 0, 64)
 	for i := 0; i < count; i++ {
 		b := buf[i*procinfo_len : i*procinfo_len+procinfo_len]
 		k, err := parse_kinfo_proc(b)
@@ -192,18 +182,17 @@ func processes() ([]Process, error) {
 		if err != nil {
 			continue
 		}
-		p.ppid, p.pgrp, p.sid, p.binary = copy_params(&k)
 
-		results = append(results, p)
+		p.ppid, p.pgrp, p.sid, p.binary = copyParams(&k)
+		procs = append(procs, p)
 	}
 
-	return results, nil
+	return procs, nil
 }
 
 func parse_kinfo_proc(buf []byte) (Kinfo_proc, error) {
 	var k Kinfo_proc
-	br := bytes.NewReader(buf)
-	err := binary.Read(br, binary.LittleEndian, &k)
+	err := binary.Read(bytes.NewReader(buf), binary.LittleEndian, &k)
 	if err != nil {
 		return k, err
 	}
@@ -222,16 +211,14 @@ func call_syscall(mib []int32) ([]byte, uint64, error) {
 		uintptr(miblen),
 		0,
 		uintptr(unsafe.Pointer(&length)),
-		0,
-		0)
+		0, 0)
 	if err != 0 {
-		b := make([]byte, 0)
-		return b, length, err
+		return nil, 0, err
 	}
 	if length == 0 {
-		b := make([]byte, 0)
-		return b, length, err
+		return nil, 0, errors.New("length == 0")
 	}
+
 	// get proc info itself
 	buf := make([]byte, length)
 	_, _, err = syscall.RawSyscall6(
@@ -240,8 +227,7 @@ func call_syscall(mib []int32) ([]byte, uint64, error) {
 		uintptr(miblen),
 		uintptr(unsafe.Pointer(&buf[0])),
 		uintptr(unsafe.Pointer(&length)),
-		0,
-		0)
+		0, 0)
 	if err != 0 {
 		return buf, length, err
 	}

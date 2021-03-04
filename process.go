@@ -1,9 +1,4 @@
-// ps lists ystem processes.
-//
-// NOTE: If you're reading these docs online via GoDocs or some other system,
-// you might only see the Unix docs. This project makes heavy use of
-// platform-specific implementations. We recommend reading the source if you
-// are interested.
+// ps lists system processes.
 package ps
 
 import (

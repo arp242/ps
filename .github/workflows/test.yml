@@ -1,0 +1,42 @@
+on:
+  push:         {'branches': ['master']}
+  pull_request: {'branches': ['master']}
+
+jobs:
+  test:
+    strategy:
+      matrix:
+        go-version: ['1.16.x']
+        os: ['ubuntu-latest', 'macos-latest', 'windows-latest']
+
+    runs-on: ${{ matrix.os }}
+    steps:
+    - uses: actions/setup-go@v2
+      with:
+        go-version: ${{ matrix.go-version }}
+    - uses: actions/checkout@v2
+    - name: Test
+      run: 'go test -v -race ./...'
+
+  test-freebsd:
+    runs-on: macos-latest
+    steps:
+    - uses: actions/checkout@v2
+    - uses: vmactions/freebsd-vm@v0.1.2
+      with:
+        usesh: true
+        prepare: 'pkg install -y go'
+        run: 'go test -v -race ./...'
+
+  # TODO: this doesn't work: it can't install the "go" package.
+  # I'm not really familiar with illumos; I'll just remove illumos support until
+  # someone cares enough help me out to fix this test runner.
+  #test-illumos:
+  #  runs-on: macos-latest
+  #  steps:
+  #  - uses: actions/checkout@master
+  #  - uses: papertigers/illumos-vm@main
+  #    with:
+  #      mem: 1024
+  #      prepare: 'pkg install go'
+  #      run: 'go test -v -race ./...'

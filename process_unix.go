@@ -1,4 +1,4 @@
-// +build linux solaris
+// +build linux
 
 package ps
 
@@ -29,23 +29,21 @@ func (p *UnixProcess) PPid() int          { return p.ppid }
 func (p *UnixProcess) Executable() string { return p.binary }
 
 func findProcess(pid int) (Process, error) {
-	dir := fmt.Sprintf("/proc/%d", pid)
-	_, err := os.Stat(dir)
+	_, err := os.Stat(fmt.Sprintf("/proc/%d", pid))
 	if err != nil {
 		return nil, err
 	}
-
 	return newUnixProcess(pid)
 }
 
-func processes() ([]Process, error) {
+func processes() (Processes, error) {
 	d, err := os.Open("/proc")
 	if err != nil {
 		return nil, err
 	}
 	defer d.Close()
 
-	results := make([]Process, 0, 50)
+	procs := make(Processes, 0, 64)
 	for {
 		names, err := d.Readdirnames(10)
 		if err == io.EOF {
@@ -73,11 +71,10 @@ func processes() ([]Process, error) {
 				continue
 			}
 
-			results = append(results, p)
+			procs = append(procs, p)
 		}
 	}
-
-	return results, nil
+	return procs, nil
 }
 
 func newUnixProcess(pid int) (*UnixProcess, error) {

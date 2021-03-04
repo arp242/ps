@@ -10,13 +10,13 @@ import (
 
 // Refresh reloads all the data associated with this process.
 func (p *UnixProcess) Refresh() error {
-	dataBytes, err := ioutil.ReadFile(fmt.Sprintf("/proc/%d/stat", p.pid))
+	d, err := ioutil.ReadFile(fmt.Sprintf("/proc/%d/stat", p.pid))
 	if err != nil {
 		return err
 	}
 
 	// First, parse out the image name
-	data := string(dataBytes)
+	data := string(d)
 	binStart := strings.IndexRune(data, '(') + 1
 	binEnd := strings.IndexRune(data[binStart:], ')')
 	p.binary = data[binStart : binStart+binEnd]
