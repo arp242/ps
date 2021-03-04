@@ -4,6 +4,7 @@ package ps
 
 import (
 	"fmt"
+	"os"
 	"syscall"
 	"unsafe"
 )
@@ -81,7 +82,7 @@ func findProcess(pid int) (Process, error) {
 		}
 	}
 
-	return nil, nil
+	return nil, os.ErrNotExist
 }
 
 func processes() ([]Process, error) {

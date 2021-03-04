@@ -42,12 +42,20 @@ func (p Processes) String() string {
 // which case the process table returned might contain ephemeral entities that
 // happened to be running when this was called.
 func List() (Processes, error) {
-	return processes()
+	p, err := processes()
+	if err != nil {
+		return nil, fmt.Errorf("ps.List: %w", err)
+	}
+	return p, nil
 }
 
 // Find looks up a single process by pid.
 //
-// Process and error will be nil if a matching process is not found.
+// Returns an os.ErrNotExist error if the process isn't found.
 func Find(pid int) (Process, error) {
-	return findProcess(pid)
+	p, err := findProcess(pid)
+	if err != nil {
+		return nil, fmt.Errorf("ps.Find: %w", err)
+	}
+	return p, nil
 }

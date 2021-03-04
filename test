@@ -1,0 +1,12 @@
+#!/bin/sh
+
+set -euC
+
+go test .
+
+GOOS=windows go build
+GOOS=darwin go build
+GOOS=freebsd go build
+GOOS=linux go build
+GOOS=illumos go build
+GOOS=solaris go build
