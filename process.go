@@ -1,5 +1,4 @@
-// ps provides an API for finding and listing processes in a platform-agnostic
-// way.
+// ps lists ystem processes.
 //
 // NOTE: If you're reading these docs online via GoDocs or some other system,
 // you might only see the Unix docs. This project makes heavy use of
@@ -7,34 +6,48 @@
 // are interested.
 package ps
 
-// Process is the generic interface that is implemented on every platform
-// and provides common operations for processes.
+import (
+	"fmt"
+	"strconv"
+	"strings"
+)
+
+// Process is a single process.
 type Process interface {
-	// Pid is the process ID for this process.
-	Pid() int
-
-	// PPid is the parent process ID for this process.
-	PPid() int
-
-	// Executable name running this process. This is not a path to the
-	// executable.
-	Executable() string
+	fmt.Stringer
+	Pid() int           // Process ID.
+	PPid() int          // Parent process ID.
+	Executable() string // Executable name running this process, i.e. "go" or "go.exe".
 }
 
-// Processes returns all processes.
+type Processes []Process
+
+func (p Processes) String() string {
+	// TODO: align
+	var b strings.Builder
+	b.WriteString(strconv.Itoa(len(p)))
+	b.WriteString(" processes:\n")
+	for _, pp := range p {
+		b.WriteString("    ")
+		b.WriteString(pp.String())
+		b.WriteRune('\n')
+	}
+	return b.String()
+}
+
+// List all processes.
 //
-// This of course will be a point-in-time snapshot of when this method was
-// called. Some operating systems don't provide snapshot capability of the
-// process table, in which case the process table returned might contain
-// ephemeral entities that happened to be running when this was called.
-func Processes() ([]Process, error) {
+// This is a point-in-time snapshot of when this method was called. Some
+// operating systems don't provide snapshot capability of the process table, in
+// which case the process table returned might contain ephemeral entities that
+// happened to be running when this was called.
+func List() (Processes, error) {
 	return processes()
 }
 
-// FindProcess looks up a single process by pid.
+// Find looks up a single process by pid.
 //
-// Process will be nil and error will be nil if a matching process is
-// not found.
-func FindProcess(pid int) (Process, error) {
+// Process and error will be nil if a matching process is not found.
+func Find(pid int) (Process, error) {
 	return findProcess(pid)
 }

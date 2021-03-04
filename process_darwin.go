@@ -5,6 +5,7 @@ package ps
 import (
 	"bytes"
 	"encoding/binary"
+	"fmt"
 	"syscall"
 	"unsafe"
 )
@@ -15,17 +16,12 @@ type DarwinProcess struct {
 	binary string
 }
 
-func (p *DarwinProcess) Pid() int {
-	return p.pid
+func (p DarwinProcess) String() string {
+	return fmt.Sprintf("pid: %d; ppid: %d; exe: %s", p.Pid(), p.PPid(), p.Executable())
 }
-
-func (p *DarwinProcess) PPid() int {
-	return p.ppid
-}
-
-func (p *DarwinProcess) Executable() string {
-	return p.binary
-}
+func (p *DarwinProcess) Pid() int           { return p.pid }
+func (p *DarwinProcess) PPid() int          { return p.ppid }
+func (p *DarwinProcess) Executable() string { return p.binary }
 
 func findProcess(pid int) (Process, error) {
 	ps, err := processes()

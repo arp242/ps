@@ -21,17 +21,12 @@ type UnixProcess struct {
 	binary string
 }
 
-func (p *UnixProcess) Pid() int {
-	return p.pid
+func (p UnixProcess) String() string {
+	return fmt.Sprintf("pid: %d; ppid: %d; exe: %s", p.Pid(), p.PPid(), p.Executable())
 }
-
-func (p *UnixProcess) PPid() int {
-	return p.ppid
-}
-
-func (p *UnixProcess) Executable() string {
-	return p.binary
-}
+func (p *UnixProcess) Pid() int           { return p.pid }
+func (p *UnixProcess) PPid() int          { return p.ppid }
+func (p *UnixProcess) Executable() string { return p.binary }
 
 func findProcess(pid int) (Process, error) {
 	dir := fmt.Sprintf("/proc/%d", pid)

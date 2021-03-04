@@ -8,6 +8,20 @@ import (
 	"unsafe"
 )
 
+// WindowsProcess is an implementation of Process for Windows.
+type WindowsProcess struct {
+	pid  int
+	ppid int
+	exe  string
+}
+
+func (p WindowsProcess) String() string {
+	return fmt.Sprintf("pid: %d; ppid: %d; exe: %s", p.Pid(), p.PPid(), p.Executable())
+}
+func (p *WindowsProcess) Pid() int           { return p.pid }
+func (p *WindowsProcess) PPid() int          { return p.ppid }
+func (p *WindowsProcess) Executable() string { return p.exe }
+
 // Windows API functions
 var (
 	modKernel32                  = syscall.NewLazyDLL("kernel32.dll")
@@ -36,25 +50,6 @@ type PROCESSENTRY32 struct {
 	PriorityClassBase int32
 	Flags             uint32
 	ExeFile           [MAX_PATH]uint16
-}
-
-// WindowsProcess is an implementation of Process for Windows.
-type WindowsProcess struct {
-	pid  int
-	ppid int
-	exe  string
-}
-
-func (p *WindowsProcess) Pid() int {
-	return p.pid
-}
-
-func (p *WindowsProcess) PPid() int {
-	return p.ppid
-}
-
-func (p *WindowsProcess) Executable() string {
-	return p.exe
 }
 
 func newWindowsProcess(e *PROCESSENTRY32) *WindowsProcess {

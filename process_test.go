@@ -5,8 +5,8 @@ import (
 	"testing"
 )
 
-func TestFindProcess(t *testing.T) {
-	p, err := FindProcess(os.Getpid())
+func TestFind(t *testing.T) {
+	p, err := Find(os.Getpid())
 	if err != nil {
 		t.Fatalf("err: %s", err)
 	}
@@ -15,14 +15,15 @@ func TestFindProcess(t *testing.T) {
 	}
 
 	if p.Pid() != os.Getpid() {
-		t.Fatalf("bad: %#v", p.Pid())
+		t.Fatalf("bad pid: %#v", p.Pid())
 	}
+
+	t.Log(p.String())
 }
 
-func TestProcesses(t *testing.T) {
-	// This test works because there will always be SOME processes
-	// running.
-	p, err := Processes()
+func TestList(t *testing.T) {
+	// This test works because there will always be SOME processes running.
+	p, err := List()
 	if err != nil {
 		t.Fatalf("err: %s", err)
 	}
@@ -38,8 +39,9 @@ func TestProcesses(t *testing.T) {
 			break
 		}
 	}
-
 	if !found {
 		t.Fatal("should have Go")
 	}
+
+	t.Log(p.String())
 }

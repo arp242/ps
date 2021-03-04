@@ -5,9 +5,29 @@ package ps
 import (
 	"bytes"
 	"encoding/binary"
+	"fmt"
 	"syscall"
 	"unsafe"
 )
+
+// UnixProcess is an implementation of Process that contains Unix-specific
+// fields and information.
+type UnixProcess struct {
+	pid   int
+	ppid  int
+	state rune
+	pgrp  int
+	sid   int
+
+	binary string
+}
+
+func (p UnixProcess) String() string {
+	return fmt.Sprintf("pid: %d; ppid: %d; exe: %s", p.Pid(), p.PPid(), p.Executable())
+}
+func (p *UnixProcess) Pid() int           { return p.pid }
+func (p *UnixProcess) PPid() int          { return p.ppid }
+func (p *UnixProcess) Executable() string { return p.binary }
 
 // copied from sys/sysctl.h
 const (
@@ -101,33 +121,8 @@ type Kinfo_proc struct {
 	Ki_tdflags      int64
 }
 
-// UnixProcess is an implementation of Process that contains Unix-specific
-// fields and information.
-type UnixProcess struct {
-	pid   int
-	ppid  int
-	state rune
-	pgrp  int
-	sid   int
-
-	binary string
-}
-
-func (p *UnixProcess) Pid() int {
-	return p.pid
-}
-
-func (p *UnixProcess) PPid() int {
-	return p.ppid
-}
-
-func (p *UnixProcess) Executable() string {
-	return p.binary
-}
-
 // Refresh reloads all the data associated with this process.
 func (p *UnixProcess) Refresh() error {
-
 	mib := []int32{CTL_KERN, KERN_PROC, KERN_PROC_PID, int32(p.pid)}
 
 	buf, length, err := call_syscall(mib)
