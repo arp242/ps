@@ -1,34 +1,11 @@
-# Process List Library for Go [![GoDoc](https://godoc.org/github.com/mitchellh/go-ps?status.png)](https://godoc.org/github.com/mitchellh/go-ps)
+`ps` is a Go package to list system processes.
 
-go-ps is a library for Go that implements OS-specific APIs to list and
-manipulate processes in a platform-safe way. The library can find and
-list processes on Linux, Mac OS X, Solaris, and Windows.
+Import as `zgo.at/ps`. Godoc: https://pkg.go.dev/zgo.at/ps
 
-If you're new to Go, this library has a good amount of advanced Go educational
-value as well. It uses some advanced features of Go: build tags, accessing
-DLL methods for Windows, cgo for Darwin, etc.
+Supported systems: Linux, Mac OS X, Solaris, and Windows.
 
-How it works:
+---
 
-  * **Darwin** uses the `sysctl` syscall to retrieve the process table.
-  * **Unix** uses the procfs at `/proc` to inspect the process tree.
-  * **Windows** uses the Windows API, and methods such as
-    `CreateToolhelp32Snapshot` to get a point-in-time snapshot of
-    the process table.
+This is a fork of https://github.com/mitchellh/go-ps with the following changes:
 
-## Installation
 
-Install using standard `go get`:
-
-```
-$ go get github.com/mitchellh/go-ps
-...
-```
-
-## TODO
-
-Want to contribute? Here is a short TODO list of things that aren't
-implemented for this library that would be nice:
-
-  * FreeBSD support
-  * Plan9 support

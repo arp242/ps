@@ -1,3 +1,3 @@
-module github.com/mitchellh/go-ps
+module zgo.at/ps
 
 go 1.13
