@@ -18,10 +18,10 @@ type DarwinProcess struct {
 }
 
 func (p DarwinProcess) String() string {
-	return fmt.Sprintf("pid: %d; ppid: %d; exe: %s", p.Pid(), p.PPid(), p.Executable())
+	return fmt.Sprintf("pid: %d; ppid: %d; exe: %s", p.Pid(), p.ParentPid(), p.Executable())
 }
 func (p *DarwinProcess) Pid() int           { return p.pid }
-func (p *DarwinProcess) PPid() int          { return p.ppid }
+func (p *DarwinProcess) ParentPid() int     { return p.ppid }
 func (p *DarwinProcess) Executable() string { return p.binary }
 
 func findProcess(pid int) (Process, error) {

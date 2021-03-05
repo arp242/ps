@@ -11,7 +11,7 @@ import (
 type Process interface {
 	fmt.Stringer
 	Pid() int           // Process ID.
-	PPid() int          // Parent process ID.
+	ParentPid() int     // Parent process ID.
 	Executable() string // Executable name running this process, i.e. "go" or "go.exe".
 }
 

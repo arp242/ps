@@ -17,10 +17,10 @@ type WindowsProcess struct {
 }
 
 func (p WindowsProcess) String() string {
-	return fmt.Sprintf("pid: %d; ppid: %d; exe: %s", p.Pid(), p.PPid(), p.Executable())
+	return fmt.Sprintf("pid: %d; ppid: %d; exe: %s", p.Pid(), p.ParentPid(), p.Executable())
 }
 func (p *WindowsProcess) Pid() int           { return p.pid }
-func (p *WindowsProcess) PPid() int          { return p.ppid }
+func (p *WindowsProcess) ParentPid() int     { return p.ppid }
 func (p *WindowsProcess) Executable() string { return p.exe }
 
 // Windows API functions

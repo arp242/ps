@@ -23,10 +23,10 @@ type UnixProcess struct {
 }
 
 func (p UnixProcess) String() string {
-	return fmt.Sprintf("pid: %d; ppid: %d; exe: %s", p.Pid(), p.PPid(), p.Executable())
+	return fmt.Sprintf("pid: %d; ppid: %d; exe: %s", p.Pid(), p.ParentPid(), p.Executable())
 }
 func (p *UnixProcess) Pid() int           { return p.pid }
-func (p *UnixProcess) PPid() int          { return p.ppid }
+func (p *UnixProcess) ParentPid() int     { return p.ppid }
 func (p *UnixProcess) Executable() string { return p.binary }
 
 // copied from sys/sysctl.h
@@ -119,25 +119,6 @@ type Kinfo_proc struct {
 	Ki_spareint64s  [96]byte
 	Ki_sflag        int64
 	Ki_tdflags      int64
-}
-
-// Refresh reloads all the data associated with this process.
-func (p *UnixProcess) Refresh() error {
-	buf, length, err := call_syscall([]int32{CTL_KERN, KERN_PROC, KERN_PROC_PID, int32(p.pid)})
-	if err != nil {
-		return err
-	}
-	if length != uint64(unsafe.Sizeof(Kinfo_proc{})) {
-		return errors.New("sysctl call failed: wrong length")
-	}
-
-	k, err := parse_kinfo_proc(buf)
-	if err != nil {
-		return err
-	}
-
-	p.ppid, p.pgrp, p.sid, p.binary = copyParams(&k)
-	return nil
 }
 
 func copyParams(k *Kinfo_proc) (int, int, int, string) {
@@ -236,6 +217,20 @@ func call_syscall(mib []int32) ([]byte, uint64, error) {
 }
 
 func newUnixProcess(pid int) (*UnixProcess, error) {
-	p := &UnixProcess{pid: pid}
-	return p, p.Refresh()
+	buf, length, err := call_syscall([]int32{CTL_KERN, KERN_PROC, KERN_PROC_PID, int32(pid)})
+	if err != nil {
+		return nil, err
+	}
+	if length != uint64(unsafe.Sizeof(Kinfo_proc{})) {
+		return nil, errors.New("sysctl call failed: wrong length")
+	}
+
+	k, err := parse_kinfo_proc(buf)
+	if err != nil {
+		return nil, err
+	}
+
+	var p UnixProcess
+	p.ppid, p.pgrp, p.sid, p.binary = copyParams(&k)
+	return &p, nil
 }
