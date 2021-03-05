@@ -20,3 +20,6 @@ This is a fork of https://github.com/mitchellh/go-ps with the following changes:
   systems. Feel free to fix that and we can add it back, but I'd rather remove
   support for now instead of shipping an untested platform that may or may not
   work.
+
+- Add `var ProcFS = "/proc"` for Linux, for cases where the procfs is mounted
+  somewhere other than `/proc`.

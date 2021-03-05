@@ -44,7 +44,6 @@ func processes() (Processes, error) {
 		return nil, err
 	}
 
-	//procs := make([]*kinfoProc, 0, 64)
 	procs := make(Processes, 0, 64)
 	k := 0
 	for i := _KINFO_STRUCT_SIZE; i < buf.Len(); i += _KINFO_STRUCT_SIZE {

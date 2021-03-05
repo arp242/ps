@@ -11,6 +11,9 @@ import (
 	"strings"
 )
 
+// ProcFS is the path to the procfs filesystem on Linux.
+var ProcFS = "/proc"
+
 // UnixProcess is an implementation of Process that contains Unix-specific
 // fields and information.
 type UnixProcess struct {
@@ -30,7 +33,7 @@ func (p *UnixProcess) ParentPid() int     { return p.ppid }
 func (p *UnixProcess) Executable() string { return p.binary }
 
 func findProcess(pid int) (Process, error) {
-	_, err := os.Stat(fmt.Sprintf("/proc/%d", pid))
+	_, err := os.Stat(fmt.Sprintf("%s/%d", ProcFS, pid))
 	if err != nil {
 		return nil, err
 	}
@@ -38,7 +41,7 @@ func findProcess(pid int) (Process, error) {
 }
 
 func processes() (Processes, error) {
-	d, err := os.Open("/proc")
+	d, err := os.Open(ProcFS)
 	if err != nil {
 		return nil, err
 	}
@@ -79,7 +82,7 @@ func processes() (Processes, error) {
 }
 
 func newUnixProcess(pid int) (*UnixProcess, error) {
-	d, err := ioutil.ReadFile(fmt.Sprintf("/proc/%d/stat", pid))
+	d, err := ioutil.ReadFile(fmt.Sprintf("/%s/%d/stat", ProcFS, pid))
 	if err != nil {
 		return nil, err
 	}
