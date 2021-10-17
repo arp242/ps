@@ -2,6 +2,7 @@ package ps
 
 import (
 	"os"
+	"strings"
 	"testing"
 )
 
@@ -33,14 +34,14 @@ func TestList(t *testing.T) {
 	}
 
 	found := false
-	for _, p1 := range p {
-		if p1.Executable() == "go" || p1.Executable() == "go.exe" {
+	for _, pp := range p {
+		if strings.HasSuffix(pp.Executable(), "ps.test") || strings.HasSuffix(pp.Executable(), "ps.test.exe") {
 			found = true
 			break
 		}
 	}
 	if !found {
-		t.Fatal("should have Go")
+		t.Fatalf("should have Go\n%s", p)
 	}
 
 	t.Log(p.String())

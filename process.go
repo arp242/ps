@@ -10,9 +10,19 @@ import (
 // Process is a single process.
 type Process interface {
 	fmt.Stringer
-	Pid() int           // Process ID.
-	ParentPid() int     // Parent process ID.
-	Executable() string // Executable name running this process, i.e. "go" or "go.exe".
+
+	Pid() int       // Process ID.
+	ParentPid() int // Parent process ID.
+
+	// Executable name running this process, i.e. "/path/to/go" or
+	// "C:\path\to\go.exe".
+	//
+	// This tries to get the full path name, but this may also be set to just
+	// the executable name.
+	Executable() string
+
+	// Full commandline, if available.
+	Commandline() []string
 }
 
 type Processes []Process

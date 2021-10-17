@@ -14,22 +14,22 @@ import (
 // UnixProcess is an implementation of Process that contains Unix-specific
 // fields and information.
 type UnixProcess struct {
-	pid    int
-	ppid   int
-	state  rune
-	pgrp   int
-	sid    int
-	binary string
+	pid, ppid int
+	exe       string
+	cmdline   []string
+	state     rune
 }
 
 func (p UnixProcess) String() string {
-	return fmt.Sprintf("pid: %d; ppid: %d; exe: %s", p.Pid(), p.ParentPid(), p.Executable())
+	return fmt.Sprintf("pid: %d; ppid: %d; state: %c; exe: %s; cmdline: %s",
+		p.pid, p.ppid, p.state, p.exe, p.cmdline)
 }
-func (p *UnixProcess) Pid() int           { return p.pid }
-func (p *UnixProcess) ParentPid() int     { return p.ppid }
-func (p *UnixProcess) Executable() string { return p.binary }
+func (p *UnixProcess) Pid() int              { return p.pid }
+func (p *UnixProcess) ParentPid() int        { return p.ppid }
+func (p *UnixProcess) Executable() string    { return p.exe }
+func (p *UnixProcess) Commandline() []string { return p.cmdline }
 
-// copied from sys/sysctl.h
+// https://github.com/freebsd/freebsd-src/blob/147eea3/sys/sys/sysctl.h
 const (
 	CTL_KERN           = 1  // "high kernel": proc, limits
 	KERN_PROC          = 14 // struct: process entries
@@ -38,15 +38,15 @@ const (
 	KERN_PROC_PATHNAME = 12 // path to executable
 )
 
-// copied from sys/user.h
-type Kinfo_proc struct {
+// https://github.com/freebsd/freebsd-src/blob/25c6318/sys/sys/user.h#L121
+type KinfoProc struct {
 	Ki_structsize   int32
 	Ki_layout       int32
-	Ki_args         int64
+	Ki_args         int64 // struct	pargs *ki_args;		/* address of command arguments */
 	Ki_paddr        int64
 	Ki_addr         int64
 	Ki_tracep       int64
-	Ki_textvp       int64
+	Ki_textvp       int64 // struct	vnode *ki_textvp;	/* pointer to executable file */
 	Ki_fd           int64
 	Ki_vmspace      int64
 	Ki_wchan        int64
@@ -100,7 +100,7 @@ type Kinfo_proc struct {
 	Ki_wmesg        [9]byte
 	Ki_login        [18]byte
 	Ki_lockname     [9]byte
-	Ki_comm         [20]byte
+	Ki_comm         [20]byte // command name
 	Ki_emul         [17]byte
 	Ki_sparestrings [68]byte
 	Ki_spareints    [36]byte
@@ -121,21 +121,20 @@ type Kinfo_proc struct {
 	Ki_tdflags      int64
 }
 
-func copyParams(k *Kinfo_proc) (int, int, int, string) {
-	n := -1
+// TODO: get full executable name.
+// TODO: get cmdline.
+func setParams(k *KinfoProc, p *UnixProcess) {
+	p.ppid = int(k.Ki_ppid)
 	for i, b := range k.Ki_comm {
 		if b == 0 {
+			p.exe = string(k.Ki_comm[:i+1])
 			break
 		}
-		n = i + 1
 	}
-	comm := string(k.Ki_comm[:n])
-
-	return int(k.Ki_ppid), int(k.Ki_pgid), int(k.Ki_sid), comm
 }
 
 func findProcess(pid int) (Process, error) {
-	_, _, err := call_syscall([]int32{CTL_KERN, KERN_PROC, KERN_PROC_PATHNAME, int32(pid)})
+	_, _, err := callSyscall([]int32{CTL_KERN, KERN_PROC, KERN_PROC_PATHNAME, int32(pid)})
 	if err != nil {
 		return nil, err
 	}
@@ -143,19 +142,19 @@ func findProcess(pid int) (Process, error) {
 }
 
 func processes() (Processes, error) {
-	buf, length, err := call_syscall([]int32{CTL_KERN, KERN_PROC, KERN_PROC_PROC, 0})
+	buf, bufLen, err := callSyscall([]int32{CTL_KERN, KERN_PROC, KERN_PROC_PROC, 0})
 	if err != nil {
 		return nil, err
 	}
 
-	var k Kinfo_proc
-	procinfo_len := int(unsafe.Sizeof(k))
-	count := int(length / uint64(procinfo_len))
+	var k KinfoProc
+	kLen := int(unsafe.Sizeof(k))
+	count := int(bufLen / uint64(kLen))
 
 	procs := make(Processes, 0, 64)
 	for i := 0; i < count; i++ {
-		b := buf[i*procinfo_len : i*procinfo_len+procinfo_len]
-		k, err := parse_kinfo_proc(b)
+		b := buf[i*kLen : i*kLen+kLen]
+		k, err := parseKinfoProc(b)
 		if err != nil {
 			continue
 		}
@@ -164,15 +163,15 @@ func processes() (Processes, error) {
 			continue
 		}
 
-		p.ppid, p.pgrp, p.sid, p.binary = copyParams(&k)
+		setParams(&k, p)
 		procs = append(procs, p)
 	}
 
 	return procs, nil
 }
 
-func parse_kinfo_proc(buf []byte) (Kinfo_proc, error) {
-	var k Kinfo_proc
+func parseKinfoProc(buf []byte) (KinfoProc, error) {
+	var k KinfoProc
 	err := binary.Read(bytes.NewReader(buf), binary.LittleEndian, &k)
 	if err != nil {
 		return k, err
@@ -181,7 +180,7 @@ func parse_kinfo_proc(buf []byte) (Kinfo_proc, error) {
 	return k, nil
 }
 
-func call_syscall(mib []int32) ([]byte, uint64, error) {
+func callSyscall(mib []int32) ([]byte, uint64, error) {
 	miblen := uint64(len(mib))
 
 	// get required buffer size
@@ -217,20 +216,20 @@ func call_syscall(mib []int32) ([]byte, uint64, error) {
 }
 
 func newUnixProcess(pid int) (*UnixProcess, error) {
-	buf, length, err := call_syscall([]int32{CTL_KERN, KERN_PROC, KERN_PROC_PID, int32(pid)})
+	buf, length, err := callSyscall([]int32{CTL_KERN, KERN_PROC, KERN_PROC_PID, int32(pid)})
 	if err != nil {
 		return nil, err
 	}
-	if length != uint64(unsafe.Sizeof(Kinfo_proc{})) {
+	if length != uint64(unsafe.Sizeof(KinfoProc{})) {
 		return nil, errors.New("sysctl call failed: wrong length")
 	}
 
-	k, err := parse_kinfo_proc(buf)
+	k, err := parseKinfoProc(buf)
 	if err != nil {
 		return nil, err
 	}
 
 	var p UnixProcess
-	p.ppid, p.pgrp, p.sid, p.binary = copyParams(&k)
+	setParams(&k, &p)
 	return &p, nil
 }

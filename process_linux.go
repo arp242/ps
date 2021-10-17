@@ -3,10 +3,12 @@
 package ps
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"io/ioutil"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 )
@@ -17,20 +19,20 @@ var ProcFS = "/proc"
 // UnixProcess is an implementation of Process that contains Unix-specific
 // fields and information.
 type UnixProcess struct {
-	pid    int
-	ppid   int
-	state  rune
-	pgrp   int
-	sid    int
-	binary string
+	pid, ppid int
+	exe       string
+	cmdline   []string
+	state     rune
 }
 
 func (p UnixProcess) String() string {
-	return fmt.Sprintf("pid: %d; ppid: %d; exe: %s", p.Pid(), p.ParentPid(), p.Executable())
+	return fmt.Sprintf("pid: %d; ppid: %d; state: %c; exe: %s; cmdline: %s",
+		p.pid, p.ppid, p.state, p.exe, p.cmdline)
 }
-func (p *UnixProcess) Pid() int           { return p.pid }
-func (p *UnixProcess) ParentPid() int     { return p.ppid }
-func (p *UnixProcess) Executable() string { return p.binary }
+func (p *UnixProcess) Pid() int              { return p.pid }
+func (p *UnixProcess) ParentPid() int        { return p.ppid }
+func (p *UnixProcess) Executable() string    { return p.exe }
+func (p *UnixProcess) Commandline() []string { return p.cmdline }
 
 func findProcess(pid int) (Process, error) {
 	_, err := os.Stat(fmt.Sprintf("%s/%d", ProcFS, pid))
@@ -82,31 +84,50 @@ func processes() (Processes, error) {
 }
 
 func newUnixProcess(pid int) (*UnixProcess, error) {
-	d, err := ioutil.ReadFile(fmt.Sprintf("/%s/%d/stat", ProcFS, pid))
+	p := UnixProcess{pid: pid}
+	proc := fmt.Sprintf("/%s/%d", ProcFS, pid)
+
+	d, err := ioutil.ReadFile(proc + "/status")
 	if err != nil {
 		return nil, err
 	}
-
-	// First, parse out the image name
-	data := string(d)
-	binStart := strings.IndexRune(data, '(') + 1
-	binEnd := strings.IndexRune(data[binStart:], ')')
-
-	p := UnixProcess{
-		pid:    pid,
-		binary: data[binStart : binStart+binEnd],
+	for _, line := range bytes.Split(d, []byte("\n")) {
+		s := bytes.SplitN(line, []byte(":"), 2)
+		if len(s) < 2 {
+			continue
+		}
+		s[1] = bytes.TrimSpace(s[1])
+		switch string(s[0]) { // TODO: also list other fields.
+		case "Name":
+			p.exe = string(s[1])
+		case "State":
+			if len(s[1]) > 0 {
+				p.state = rune(s[1][0])
+			}
+		case "PPid":
+			p.ppid, _ = strconv.Atoi(string(s[1]))
+		}
 	}
 
-	// Move past the image name and start parsing the rest
-	data = data[binStart+binEnd+2:]
-	_, err = fmt.Sscanf(data,
-		"%c %d %d %d",
-		&p.state,
-		&p.ppid,
-		&p.pgrp,
-		&p.sid)
-	if err != nil {
-		return nil, err
+	d, err = ioutil.ReadFile(proc + "/cmdline")
+	if err == nil {
+		p.cmdline = strings.Split(string(bytes.TrimRight(d, "\x00")), "\x00")
 	}
+
+	// The enry in the stat and status files are limited to 16 characters, so
+	// try to get the full path from the exe symlink.
+	exe, err := os.Readlink(proc + "/exe")
+	if err == nil {
+		if !filepath.IsAbs(exe) {
+			abs, err := filepath.Abs(exe)
+			if err == nil {
+				exe = abs
+			}
+		}
+		p.exe = exe
+	} else if len(p.cmdline) > 0 && len(p.cmdline[0]) > 0 && p.cmdline[0][0] == '/' {
+		p.exe = p.cmdline[0]
+	}
+
 	return &p, nil
 }

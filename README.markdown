@@ -1,6 +1,6 @@
 `ps` is a Go package to list system processes.
 
-Import as `zgo.at/ps`. Godoc: https://pkg.go.dev/zgo.at/ps#pkg-overview
+Import as `zgo.at/ps`. Godoc: https://godocs.io/zgo.at/ps
 
 Supported systems: Linux, Windows, macOS, and FreeBSD.
 
@@ -10,6 +10,11 @@ This is a fork of https://github.com/mitchellh/go-ps with the following changes:
 
 - `Processes()` → `List()`; `FindProcess()` → `Find()`; `Process.PPid() →
   `Process.ParentPid()`.
+
+- `Executable()` now returns the full path, if available, instead of just the
+  binary name.
+
+- Add `Commandline()` to get the full commandline, if available.
 
 - Add `String()` method, and `List()` returns a `Processes` with `String()`.
 

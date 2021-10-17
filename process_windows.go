@@ -11,17 +11,20 @@ import (
 
 // WindowsProcess is an implementation of Process for Windows.
 type WindowsProcess struct {
-	pid  int
-	ppid int
-	exe  string
+	pid     int
+	ppid    int
+	exe     string
+	cmdline []string
 }
 
 func (p WindowsProcess) String() string {
-	return fmt.Sprintf("pid: %d; ppid: %d; exe: %s", p.Pid(), p.ParentPid(), p.Executable())
+	return fmt.Sprintf("pid: %d; ppid: %d; state: %c; cmdline: %s",
+		p.pid, p.ppid, p.exe, p.cmdline)
 }
-func (p *WindowsProcess) Pid() int           { return p.pid }
-func (p *WindowsProcess) ParentPid() int     { return p.ppid }
-func (p *WindowsProcess) Executable() string { return p.exe }
+func (p *WindowsProcess) Pid() int              { return p.pid }
+func (p *WindowsProcess) ParentPid() int        { return p.ppid }
+func (p *WindowsProcess) Executable() string    { return p.exe }
+func (p *WindowsProcess) Commandline() []string { return p.cmdline }
 
 // Windows API functions
 var (
@@ -40,17 +43,19 @@ const (
 
 // PROCESSENTRY32 is the Windows API structure that contains a process's
 // information.
+//
+// https://docs.microsoft.com/en-us/windows/win32/api/tlhelp32/ns-tlhelp32-processentry32
 type PROCESSENTRY32 struct {
-	Size              uint32
-	CntUsage          uint32
-	ProcessID         uint32
-	DefaultHeapID     uintptr
-	ModuleID          uint32
-	CntThreads        uint32
-	ParentProcessID   uint32
-	PriorityClassBase int32
-	Flags             uint32
-	ExeFile           [MAX_PATH]uint16
+	Size              uint32           // Size of the structure, in bytes
+	CntUsage          uint32           // Unused; always 0.
+	ProcessID         uint32           // The process identifier.
+	DefaultHeapID     uintptr          // Unused; always 0.
+	ModuleID          uint32           // Unused; always 0.
+	CntThreads        uint32           // Number of execution threads started by the process.
+	ParentProcessID   uint32           // The identifier of the process that created this process (its parent process).
+	PriorityClassBase int32            // The base priority of any threads created by this process.
+	Flags             uint32           // Unused: always 0.
+	ExeFile           [MAX_PATH]uint16 // The name of the executable file for the process.
 }
 
 func newWindowsProcess(e *PROCESSENTRY32) *WindowsProcess {
@@ -63,6 +68,14 @@ func newWindowsProcess(e *PROCESSENTRY32) *WindowsProcess {
 		end++
 	}
 
+	// To retrieve the full path to the executable file, call the Module32First
+	// function and check the szExePath member of the MODULEENTRY32 structure
+	// that is returned. However, if the calling process is a 32-bit process,
+	// you must call the QueryFullProcessImageName function to retrieve the full
+	// path of the executable file for a 64-bit process.
+
+	// TODO: get full executable name.
+	// TODO: get cmdline.
 	return &WindowsProcess{
 		pid:  int(e.ProcessID),
 		ppid: int(e.ParentProcessID),
